@@ -28,7 +28,7 @@ public class Main {
                 }
             }
 
-            // least 2 requests among 5 latest
+            // check for at least 2 requests among 5 latest
             int blocked = 0, nonBlocked = 0;
             for (Pair p : lastFiveRequests) {
                 if (p.key().equals(request)) {
