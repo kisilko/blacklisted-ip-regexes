@@ -1,10 +1,7 @@
 package org.example;
 
 import java.sql.Array;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Pattern;
 
 public class Main {
@@ -19,7 +16,8 @@ public class Main {
                 .toList();
 
         List<Integer> result = new ArrayList<>();
-        Deque<Pair> lastFiveRequests = new ArrayDeque<>();
+        LimitedSizeCache<String, Integer> lastFiveRequests = new LimitedSizeCache<>(5);
+
         for (String request : requests) {
             int isBlocked = 0;
             for (Pattern pattern : patterns) {
@@ -29,16 +27,8 @@ public class Main {
             }
 
             // check for at least 2 requests among 5 latest
-            int blocked = 0, nonBlocked = 0;
-            for (Pair p : lastFiveRequests) {
-                if (p.key().equals(request)) {
-                    if (p.value() == 1) {
-                        blocked++;
-                    } else {
-                        nonBlocked++;
-                    }
-                }
-            }
+            int blocked = lastFiveRequests.getGroupedValue(request, 1); // 1 - blocked
+            int nonBlocked = lastFiveRequests.getGroupedValue(request, 0); // 0 - nonBlocked
 
             if (nonBlocked >= 2 && blocked == 0) {
                 isBlocked = 1;
@@ -46,12 +36,7 @@ public class Main {
                 isBlocked = 0;
             }
 
-            // keep latest 5 requests
-            lastFiveRequests.addLast(new Pair(request, isBlocked));
-            if (lastFiveRequests.size() > 5) {
-                lastFiveRequests.removeFirst();
-            }
-
+            lastFiveRequests.put(request, isBlocked);
             result.add(isBlocked);
         }
 
@@ -62,5 +47,37 @@ public class Main {
         return "^" + rawRegex.replace(".", "\\.").replace("*", "(?:\\d{1,3}\\.?)*") + "$";
     }
 
-    public static record Pair(String key, Integer value) {}
+    public static record Pair<T, V>(T key, V value) {}
+
+    public static class LimitedSizeCache<T, V> {
+        private final int size;
+        private final Deque<Pair<T, V>> cache = new ArrayDeque<>();
+        private final Map<Pair<T, V>, Integer> lookup = new HashMap<>();
+
+        public LimitedSizeCache(int size) {
+            this.size = size;
+        }
+
+        public void put(T key, V value) {
+
+            if (cache.size() >= this.size) {
+                Pair<T, V> oldestEntry = cache.removeFirst();
+                int oldestEntryCount = lookup.get(oldestEntry);
+                if (oldestEntryCount == 1) {
+                    lookup.remove(oldestEntry);
+                } else {
+                    lookup.put(oldestEntry, oldestEntryCount - 1);
+                }
+            }
+
+            var p = new Pair<T, V>(key, value);
+            cache.addLast(p);
+            lookup.put(p, lookup.getOrDefault(p, 0) + 1);
+        }
+
+        public int getGroupedValue(T key, V value) {
+            var p = new Pair<T, V>(key, value);
+            return lookup.getOrDefault(p, 0);
+        }
+    }
 }
